@@ -1,98 +1,75 @@
-import os
-import random
-import time
+import tkinter as tk
+from random import random
 
-# --- Configuration Constants ---
-WIDTH = 40       # Number of columns in the grid
-HEIGHT = 20      # Number of rows in the grid
-LIVE_CHAR = "O"  # Visual representation of a living cell
-DEAD_CHAR = "."  # Visual representation of a dead cell
-SPEED = 0.1      # Delay between generations in seconds
+CELL=12
+ROWS,COLS=50,70
 
+class Life:
+    def __init__(self,root):
+        self.root=root
+        self.running=False
+        self.grid=[[0]*COLS for _ in range(ROWS)]
+        self.cv=tk.Canvas(root,width=COLS*CELL,height=ROWS*CELL,bg="white")
+        self.cv.pack()
+        bar=tk.Frame(root); bar.pack()
+        tk.Button(bar,text="Play/Pause",command=self.toggle).pack(side="left")
+        tk.Button(bar,text="Step",command=self.step).pack(side="left")
+        tk.Button(bar,text="Random",command=self.rand).pack(side="left")
+        tk.Button(bar,text="Clear",command=self.clear).pack(side="left")
+        self.cv.bind("<Button-1>",self.click)
+        self.draw()
 
-def create_initial_grid():
-    """Generates a grid randomly populated with alive and dead cells."""
-    grid = []
-    for _ in range(HEIGHT):
-        row = []
-        for _ in range(WIDTH):
-            # 20% chance to start alive, 80% chance dead
-            if random.random() < 0.2:
-                row.append(LIVE_CHAR)
-            else:
-                row.append(DEAD_CHAR)
-        grid.append(row)
-    return grid
+    def click(self,e):
+        c=e.x//CELL; r=e.y//CELL
+        if 0<=r<ROWS and 0<=c<COLS:
+            self.grid[r][c]^=1
+            self.draw()
 
+    def draw(self):
+        self.cv.delete("all")
+        for r in range(ROWS):
+            for c in range(COLS):
+                x,y=c*CELL,r*CELL
+                fill="black" if self.grid[r][c] else "white"
+                self.cv.create_rectangle(x,y,x+CELL,y+CELL,fill=fill,outline="#ccc")
 
-def print_grid(grid, generation):
-    """Clears the terminal and displays the current state of the grid."""
-    # 'cls' for Windows, 'clear' for Linux/macOS
-    os.system("cls" if os.name == "nt" else "clear")
-    print(f"--- Conway's Game of Life: Generation {generation} ---")
-    for row in grid:
-        print(" ".join(row))
+    def neighbors(self,r,c):
+        s=0
+        for dr in(-1,0,1):
+            for dc in(-1,0,1):
+                if dr==dc==0: continue
+                rr,cc=r+dr,c+dc
+                if 0<=rr<ROWS and 0<=cc<COLS:
+                    s+=self.grid[rr][cc]
+        return s
 
+    def step(self):
+        new=[[0]*COLS for _ in range(ROWS)]
+        for r in range(ROWS):
+            for c in range(COLS):
+                n=self.neighbors(r,c)
+                new[r][c]=1 if (self.grid[r][c] and n in (2,3)) or (not self.grid[r][c] and n==3) else 0
+        self.grid=new
+        self.draw()
 
-def count_live_neighbors(grid, r, c):
-    """Counts the live neighbors around a given cell with edge wrapping."""
-    live_neighbors = 0
+    def loop(self):
+        if self.running:
+            self.step()
+        self.root.after(100,self.loop)
 
-    # Loop through the 3x3 block around the cell
-    for dr in [-1, 0, 1]:
-        for dc in [-1, 0, 1]:
-            if dr == 0 and dc == 0:
-                continue  # Skip the cell itself
+    def toggle(self):
+        self.running=not self.running
 
-            # Modulo arithmetic handles wrapping at the grid boundaries
-            neighbor_r = (r + dr) % HEIGHT
-            neighbor_c = (c + dc) % WIDTH
+    def rand(self):
+        self.grid=[[1 if random()<0.25 else 0 for _ in range(COLS)] for _ in range(ROWS)]
+        self.draw()
 
-            if grid[neighbor_r][neighbor_c] == LIVE_CHAR:
-                live_neighbors += 1
+    def clear(self):
+        self.grid=[[0]*COLS for _ in range(ROWS)]
+        self.draw()
 
-    return live_neighbors
-
-
-def compute_next_generation(current_grid):
-    """Applies Conway's rules to calculate the state of the next grid."""
-    next_grid = [[DEAD_CHAR for _ in range(WIDTH)] for _ in range(HEIGHT)]
-
-    for r in range(HEIGHT):
-        for c in range(WIDTH):
-            live_neighbors = count_live_neighbors(current_grid, r, c)
-            current_state = current_grid[r][c]
-
-            # Rule 1 & 3: Underpopulation / Overpopulation (Dies)
-            # Rule 2: Survival (Lives on)
-            if current_state == LIVE_CHAR:
-                if live_neighbors in [2, 3]:
-                    next_grid[r][c] = LIVE_CHAR
-                else:
-                    next_grid[r][c] = DEAD_CHAR
-
-            # Rule 4: Reproduction (A new cell is born)
-            elif current_state == DEAD_CHAR:
-                if live_neighbors == 3:
-                    next_grid[r][c] = LIVE_CHAR
-
-    return next_grid
-
-
-def main():
-    """Main game loop controlling the simulation flow."""
-    grid = create_initial_grid()
-    generation = 0
-
-    try:
-        while True:
-            print_grid(grid, generation)
-            grid = compute_next_generation(grid)
-            generation += 1
-            time.sleep(SPEED)
-    except KeyboardInterrupt:
-        print("\nSimulation ended by user. Goodbye!")
-
-
-if __name__ == "__main__":
-    main()
+root=tk.Tk()
+root.title("Conway's Game of Life")
+app=Life(root)
+app.loop()
+root.mainloop()
